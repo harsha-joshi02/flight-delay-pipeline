@@ -1,0 +1,66 @@
+name: Weekly Retrain
+
+on:
+  schedule:
+    - cron: "0 1 * * 0"  # Every Sunday at 01:00 UTC
+  workflow_dispatch:      # Allow manual trigger from GitHub UI
+
+jobs:
+  retrain:
+    name: Ingest → Train → Gate → Monitor
+    runs-on: ubuntu-latest
+
+    env:
+      MLFLOW_TRACKING_URI: ${{ secrets.MLFLOW_TRACKING_URI }}
+      MLFLOW_EXPERIMENT_NAME: flight-delay-prediction
+      MLFLOW_MODEL_NAME: flight-delay-model
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MODEL_PROMOTION_THRESHOLD: "0.005"
+      DELAY_THRESHOLD_MINUTES: "15"
+      DATA_RAW_DIR: /tmp/pipeline/raw
+      DATA_PROCESSED_DIR: /tmp/pipeline/processed
+      MODELS_DIR: /tmp/pipeline/models
+      REPORTS_DIR: /tmp/pipeline/reports
+      INITIAL_MONTHS: "3"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create data directories
+        run: mkdir -p /tmp/pipeline/{raw,processed,models,reports}
+
+      - name: Ingest latest BTS data
+        run: python scripts/ingest.py --months 3
+
+      - name: Train model and run promotion gate
+        run: python scripts/train.py
+
+      - name: Run drift monitoring report
+        run: python -m flows.monitoring_flow
+        continue-on-error: true  # Don't fail the pipeline if no prediction logs yet
+
+      - name: Upload gate report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gate-report-${{ github.run_id }}
+          path: /tmp/pipeline/reports/gate_report.json
+          if-no-files-found: ignore
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift-report-${{ github.run_id }}
+          path: /tmp/pipeline/reports/weekly_drift_summary.json
+          if-no-files-found: ignore

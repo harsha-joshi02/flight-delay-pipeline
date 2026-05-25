@@ -1,0 +1,41 @@
+name: CI — Lint & Test
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Lint & Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with ruff
+        run: ruff check src/ tests/
+
+      - name: Run unit tests
+        env:
+          MLFLOW_TRACKING_URI: sqlite:///mlflow_test.db
+          MLFLOW_EXPERIMENT_NAME: test-experiment
+          MLFLOW_MODEL_NAME: test-model
+          MODEL_PROMOTION_THRESHOLD: "0.005"
+          DELAY_THRESHOLD_MINUTES: "15"
+          DATA_RAW_DIR: /tmp/test_data/raw
+          DATA_PROCESSED_DIR: /tmp/test_data/processed
+          MODELS_DIR: /tmp/test_data/models
+          REPORTS_DIR: /tmp/test_data/reports
+        run: pytest tests/ -v --cov=src --cov-report=term-missing

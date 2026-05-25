@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Environment
+.env
+!.env.example
+
+# Data (large files — not version controlled)
+data/raw/*
+data/processed/*
+data/reference/*
+data/models/*
+data/reports/*.html
+data/reports/*.json
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/reference/.gitkeep
+!data/models/.gitkeep
+!data/reports/.gitkeep
+
+# MLflow
+mlflow_test.db
+mlruns/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Linting
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Claude Code
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

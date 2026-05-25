@@ -1,0 +1,95 @@
+version: "3.9"
+
+x-app-env: &app-env
+  MLFLOW_TRACKING_URI: http://mlflow:5000
+  MLFLOW_EXPERIMENT_NAME: flight-delay-prediction
+  MLFLOW_MODEL_NAME: flight-delay-model
+  DATA_RAW_DIR: /app/data/raw
+  DATA_PROCESSED_DIR: /app/data/processed
+  MODELS_DIR: /app/data/models
+  REPORTS_DIR: /app/data/reports
+  MODEL_PROMOTION_THRESHOLD: "0.005"
+  DELAY_THRESHOLD_MINUTES: "15"
+
+services:
+
+  # ── PostgreSQL (MLflow backend store) ───────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: mluser
+      POSTGRES_PASSWORD: mlpassword
+      POSTGRES_DB: flight_ml
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mluser -d flight_ml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MLflow tracking server ──────────────────────────────────────────────────
+  mlflow:
+    image: python:3.11-slim
+    command: ["sh", "-c", "pip install 'mlflow==2.14.3' psycopg2-binary --quiet && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mluser:mlpassword@postgres:5432/flight_ml --default-artifact-root /mlflow/artifacts"]
+    volumes:
+      - mlflow_artifacts:/mlflow/artifacts
+    ports:
+      - "5001:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 60s
+
+  # ── FastAPI prediction server ───────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: final
+    command: uvicorn src.serving.app:app --host 0.0.0.0 --port 8000 --workers 2
+    environment:
+      <<: *app-env
+      API_HOST: 0.0.0.0
+      API_PORT: "8000"
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+
+  # ── Streamlit dashboard ─────────────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      target: final
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    environment:
+      <<: *app-env
+      API_BASE_URL: http://api:8000
+      REPORTS_DIR: /app/data/reports
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8501:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  mlflow_artifacts:
