@@ -25,7 +25,6 @@ st.set_page_config(
 )
 
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=60)
 def fetch_mlflow_runs() -> pd.DataFrame:
@@ -90,8 +89,6 @@ def load_gate_report() -> dict | None:
         return json.load(f)
 
 
-# ── Sidebar ───────────────────────────────────────────────────────────────────
-
 st.sidebar.title("✈ Flight Delay ML")
 health = fetch_health()
 status_color = "green" if health["status"] == "ok" else "red"
@@ -105,8 +102,6 @@ page = st.sidebar.radio(
     "Navigate",
     ["Live Prediction", "Model Performance", "Drift Reports", "MLflow Run History"],
 )
-
-# ── Page: Live Prediction ─────────────────────────────────────────────────────
 
 if page == "Live Prediction":
     st.title("Live Flight Delay Prediction")
@@ -179,8 +174,6 @@ if page == "Live Prediction":
                 st.info("Make sure the FastAPI service is running (`docker-compose up api`)")
 
 
-# ── Page: Model Performance ───────────────────────────────────────────────────
-
 elif page == "Model Performance":
     st.title("Model Performance")
     gate_report = load_gate_report()
@@ -224,8 +217,6 @@ elif page == "Model Performance":
                           "precision", "recall", "n_estimators", "max_depth"]],
                      use_container_width=True)
 
-
-# ── Page: Drift Reports ───────────────────────────────────────────────────────
 
 elif page == "Drift Reports":
     st.title("Data & Prediction Drift")
@@ -284,8 +275,6 @@ elif page == "Drift Reports":
                 html_content = f.read()
             st.components.v1.html(html_content, height=600, scrolling=True)
 
-
-# ── Page: MLflow Run History ──────────────────────────────────────────────────
 
 elif page == "MLflow Run History":
     st.title("MLflow Run History")

@@ -33,7 +33,9 @@ services:
   # ── MLflow tracking server ──────────────────────────────────────────────────
   mlflow:
     image: python:3.11-slim
-    command: ["sh", "-c", "pip install 'mlflow==2.14.3' psycopg2-binary --quiet && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mluser:mlpassword@postgres:5432/flight_ml --default-artifact-root /mlflow/artifacts"]
+    command: ["sh", "-c", "pip install 'mlflow>=2.14.0' psycopg2-binary --quiet && mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://mluser:mlpassword@postgres:5432/flight_ml --artifacts-destination /mlflow/artifacts --serve-artifacts"]
+    environment:
+      MLFLOW_SERVER_ALLOWED_HOSTS: "*"
     volumes:
       - mlflow_artifacts:/mlflow/artifacts
     ports:

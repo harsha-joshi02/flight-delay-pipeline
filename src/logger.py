@@ -10,23 +10,23 @@ class _BoundLogger:
     def __init__(self, logger: logging.Logger) -> None:
         self._logger = logger
 
-    def _fmt(self, msg: str, kwargs: dict) -> str:
+    def _fmt(self, message: str, kwargs: dict) -> str:
         if kwargs:
             kv = " ".join(f"{k}={v}" for k, v in kwargs.items())
-            return f"{msg} | {kv}"
-        return msg
+            return f"{message} | {kv}"
+        return message
 
-    def info(self, msg: str, **kwargs) -> None:
-        self._logger.info(self._fmt(msg, kwargs))
+    def info(self, message: str, **kwargs) -> None:
+        self._logger.info(self._fmt(message, kwargs))
 
-    def warning(self, msg: str, **kwargs) -> None:
-        self._logger.warning(self._fmt(msg, kwargs))
+    def warning(self, message: str, **kwargs) -> None:
+        self._logger.warning(self._fmt(message, kwargs))
 
-    def error(self, msg: str, **kwargs) -> None:
-        self._logger.error(self._fmt(msg, kwargs))
+    def error(self, message: str, **kwargs) -> None:
+        self._logger.error(self._fmt(message, kwargs))
 
-    def debug(self, msg: str, **kwargs) -> None:
-        self._logger.debug(self._fmt(msg, kwargs))
+    def debug(self, message: str, **kwargs) -> None:
+        self._logger.debug(self._fmt(message, kwargs))
 
 
 def get_logger(name: str) -> _BoundLogger:

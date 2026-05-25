@@ -49,7 +49,7 @@ def _load_model_and_transformer() -> None:
 
     log.info("Loading production model", uri=model_uri)
     try:
-        _state["model"] = mlflow.pyfunc.load_model(model_uri)
+        _state["model"] = mlflow.xgboost.load_model(model_uri)
         client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
         versions = client.get_latest_versions(MLFLOW_MODEL_NAME, stages=["Production"])
         _state["model_version"] = versions[0].version if versions else "unknown"
@@ -126,11 +126,7 @@ def _predict_one(flight: FlightInput) -> PredictionResult:
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     features = _input_to_features(flight)
-    prob = float(model.predict(features)[0])
-
-    raw_model = model._model_impl
-    if hasattr(raw_model, "predict_proba"):
-        prob = float(raw_model.predict_proba(features)[:, 1][0])
+    prob = float(model.predict_proba(features)[:, 1][0])
 
     return PredictionResult(
         delay_probability=round(prob, 4),
