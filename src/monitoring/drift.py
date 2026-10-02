@@ -9,13 +9,13 @@ from typing import Optional
 
 import pandas as pd
 
-from src.config import DATA_PROCESSED_DIR, DATA_REFERENCE_DIR, FEATURE_COLS, REPORTS_DIR
+from src.config import DATA_REFERENCE_DIR, FEATURE_COLS, REPORTS_DIR
 from src.logger import get_logger
+from src.monitoring.logger import PredictionLogger
 
 log = get_logger(__name__)
 
 REFERENCE_PARQUET = DATA_REFERENCE_DIR / "reference_snapshot.parquet"
-PREDICTIONS_PARQUET = DATA_PROCESSED_DIR / "predictions_log.parquet"
 
 _DRIFT_PSI_THRESHOLD: float = 0.2
 _PREDICTION_DRIFT_THRESHOLD: float = 0.1
@@ -45,11 +45,10 @@ def load_reference() -> Optional[pd.DataFrame]:
 
 
 def load_predictions(limit: int = 5000) -> Optional[pd.DataFrame]:
-    if not PREDICTIONS_PARQUET.exists():
-        log.warning("No prediction log found", path=str(PREDICTIONS_PARQUET))
+    df = PredictionLogger().load_predictions(limit=limit)
+    if df.empty:
+        log.warning("No prediction logs found")
         return None
-    df = pd.read_parquet(PREDICTIONS_PARQUET)
-    df = df.sort_values("predicted_at", ascending=False).head(limit)
     log.info("Loaded prediction log", rows=len(df))
     return df
 

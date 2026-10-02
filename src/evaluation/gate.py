@@ -48,12 +48,8 @@ class GateReport:
 
 def _get_production_model() -> Optional[ModelVersion]:
     client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
-    try:
-        versions = client.get_latest_versions(MLFLOW_MODEL_NAME, stages=["Production"])
-        return versions[0] if versions else None
-    except Exception as exc:
-        log.warning("Could not fetch production model", error=str(exc))
-        return None
+    versions = client.get_latest_versions(MLFLOW_MODEL_NAME, stages=["Production"])
+    return versions[0] if versions else None
 
 
 def _auc_from_run(run_id: str) -> Optional[float]:
@@ -79,12 +75,10 @@ def _transition_model(version: str, stage: str) -> None:
 
 def _get_new_model_version(run_id: str) -> Optional[str]:
     client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
-    try:
-        versions = client.search_model_versions(f"run_id='{run_id}'")
-        if versions:
-            return versions[0].version
-    except Exception as exc:
-        log.warning("Could not find model version for run", run_id=run_id, error=str(exc))
+    versions = client.search_model_versions(f"run_id='{run_id}'")
+    for version in versions:
+        if version.name == MLFLOW_MODEL_NAME:
+            return version.version
     return None
 
 
@@ -99,13 +93,15 @@ def evaluate_and_gate(
     if new_auc is None:
         raise ValueError(f"Could not retrieve AUC for run {new_run_id}")
 
+    new_version = _get_new_model_version(new_run_id)
+    if new_version is None:
+        raise ValueError(f"Could not find a registered model version for run {new_run_id}")
+
     prod_model = _get_production_model()
 
     if prod_model is None:
         log.info("No production model found — promoting new model unconditionally", new_auc=new_auc)
-        new_version = _get_new_model_version(new_run_id)
-        if new_version:
-            _transition_model(new_version, "Production")
+        _transition_model(new_version, "Production")
 
         report = GateReport(
             decision=GateDecision.FIRST_MODEL,
@@ -120,25 +116,22 @@ def evaluate_and_gate(
     else:
         prod_auc = _auc_from_run(prod_model.run_id)
         if prod_auc is None:
-            log.warning("Could not retrieve production model AUC — defaulting to 0.5", prod_run_id=prod_model.run_id)
-            prod_auc = 0.5
+            raise ValueError(
+                f"Could not retrieve production AUC for run {prod_model.run_id}"
+            )
 
         delta = new_auc - prod_auc
         log.info("Comparing models", new_auc=new_auc, prod_auc=prod_auc, delta=delta, threshold=threshold)
 
         if delta >= threshold:
-            new_version = _get_new_model_version(new_run_id)
-            if new_version:
-                _transition_model(new_version, "Production")
+            _transition_model(new_version, "Production")
             decision = GateDecision.PROMOTED
             reason = (
                 f"New model AUC ({new_auc:.4f}) exceeds production AUC ({prod_auc:.4f}) "
                 f"by {delta:.4f}, above threshold {threshold}."
             )
         else:
-            new_version = _get_new_model_version(new_run_id)
-            if new_version:
-                _transition_model(new_version, "Staging")
+            _transition_model(new_version, "Staging")
             decision = GateDecision.REJECTED
             reason = (
                 f"New model AUC ({new_auc:.4f}) does not improve production AUC ({prod_auc:.4f}) "

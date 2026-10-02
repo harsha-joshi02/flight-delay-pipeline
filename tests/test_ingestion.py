@@ -56,6 +56,16 @@ class TestValidate:
         assert not report.passed
         assert any("ArrDelay" in e or "ArrDelay" in str(e) for e in report.errors + [str(report.errors)])
 
+    @pytest.mark.parametrize(
+        "column",
+        ["DayOfWeek", "CRSDepTime", "Distance", "CRSElapsedTime"],
+    )
+    def test_feature_input_columns_are_required(self, column):
+        df = make_valid_df().drop(columns=[column])
+
+        with pytest.raises(DataValidationError, match=column):
+            validate(df, raise_on_error=True)
+
     def test_high_null_rate_generates_warning(self):
         df = make_valid_df(500)
         df.loc[:400, "Distance"] = np.nan

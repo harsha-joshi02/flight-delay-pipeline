@@ -48,7 +48,6 @@ jobs:
 
       - name: Run drift monitoring report
         run: python -m flows.monitoring_flow
-        continue-on-error: true  # Don't fail the pipeline if no prediction logs yet
 
       - name: Upload gate report
         if: always()

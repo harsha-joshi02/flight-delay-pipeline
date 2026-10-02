@@ -113,6 +113,24 @@ class TestEvaluateAndGate:
         with pytest.raises(ValueError, match="AUC"):
             evaluate_and_gate("run_xyz", save_report=False)
 
+    @patch("src.evaluation.gate._auc_from_run", return_value=0.82)
+    @patch("src.evaluation.gate._get_new_model_version", return_value=None)
+    def test_raises_when_registered_version_is_unavailable(self, mock_version, mock_auc):
+        with pytest.raises(ValueError, match="registered model version"):
+            evaluate_and_gate("run_xyz", save_report=False)
+
+    @patch("src.evaluation.gate._get_production_model")
+    @patch("src.evaluation.gate._auc_from_run")
+    @patch("src.evaluation.gate._get_new_model_version", return_value="2")
+    def test_raises_when_production_auc_is_unavailable(self, mock_version, mock_auc, mock_prod):
+        prod_mock = MagicMock()
+        prod_mock.run_id = "prod_run"
+        mock_prod.return_value = prod_mock
+        mock_auc.side_effect = [0.82, None]
+
+        with pytest.raises(ValueError, match="production AUC"):
+            evaluate_and_gate("new_run", save_report=False)
+
     @patch("src.evaluation.gate._get_production_model")
     @patch("src.evaluation.gate._auc_from_run")
     @patch("src.evaluation.gate._get_new_model_version", return_value="5")

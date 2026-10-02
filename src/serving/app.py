@@ -7,7 +7,7 @@ from typing import Any, Optional
 
 import pandas as pd
 import uvicorn
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 import mlflow
@@ -149,12 +149,15 @@ def _predict_one(flight: FlightInput) -> tuple[PredictionResult, dict[str, float
 
 
 @app.get("/health", response_model=HealthResponse)
-async def health():
+async def health(response: Response):
+    ready = _state.get("model") is not None and _state.get("transformer") is not None
+    if not ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return HealthResponse(
-        status="ok" if _state["model"] is not None else "degraded",
-        model_loaded=_state["model"] is not None,
-        model_version=_state["model_version"],
-        uptime_seconds=round(time.time() - _state["start_time"], 2),
+        status="ok" if ready else "degraded",
+        model_loaded=ready,
+        model_version=_state.get("model_version"),
+        uptime_seconds=round(time.time() - _state.get("start_time", time.time()), 2),
     )
 
 

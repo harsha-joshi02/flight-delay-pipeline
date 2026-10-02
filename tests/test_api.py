@@ -116,6 +116,16 @@ class TestHealth:
         assert "model_loaded" in data
         assert "uptime_seconds" in data
 
+    def test_health_returns_503_when_not_ready(self, client):
+        import src.serving.app as serving_app
+
+        serving_app._state["transformer"] = None
+        resp = client.get("/health")
+
+        assert resp.status_code == 503
+        assert resp.json()["status"] == "degraded"
+        assert resp.json()["model_loaded"] is False
+
 
 class TestPredict:
     def test_predict_returns_200(self, client):

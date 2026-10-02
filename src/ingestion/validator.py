@@ -11,7 +11,19 @@ from src.logger import get_logger
 
 log = get_logger(__name__)
 
-_REQUIRED = {"Year", "Month", "Reporting_Airline", "Origin", "Dest", "ArrDelay", "Cancelled"}
+_REQUIRED = {
+    "Year",
+    "Month",
+    "DayOfWeek",
+    "CRSDepTime",
+    "Reporting_Airline",
+    "Origin",
+    "Dest",
+    "Distance",
+    "CRSElapsedTime",
+    "ArrDelay",
+    "Cancelled",
+}
 
 _NON_NEGATIVE = {"Distance", "CRSElapsedTime"}
 

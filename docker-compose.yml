@@ -1,6 +1,5 @@
-version: "3.9"
-
 x-app-env: &app-env
+  DATABASE_URL: postgresql://mluser:mlpassword@postgres:5432/flight_ml
   MLFLOW_TRACKING_URI: http://mlflow:5000
   MLFLOW_EXPERIMENT_NAME: flight-delay-prediction
   MLFLOW_MODEL_NAME: flight-delay-model
@@ -91,7 +90,7 @@ services:
       - "8501:8501"
     depends_on:
       api:
-        condition: service_healthy
+        condition: service_started
 
 volumes:
   postgres_data:
