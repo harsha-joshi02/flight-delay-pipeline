@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 import pandas as pd
 
-from src.config import DATA_PROCESSED_DIR
+from src.config import DATA_PROCESSED_DIR, FEATURE_COLS
 from src.logger import get_logger
 
 log = get_logger(__name__)
@@ -24,22 +24,22 @@ class PredictionLogger:
         features: dict[str, Any],
         prediction: float,
         model_version: Optional[str] = None,
+        raw_input: Optional[dict[str, Any]] = None,
     ) -> None:
         record = {
             "id": str(uuid.uuid4()),
-            "predicted_at": datetime.utcnow().isoformat(),
+            "predicted_at": datetime.now(timezone.utc).isoformat(),
             "model_version": model_version or "unknown",
-            "carrier": features.get("carrier", ""),
-            "origin": features.get("origin", ""),
-            "dest": features.get("dest", ""),
-            "month": float(features.get("month", 0)),
-            "day_of_week": float(features.get("day_of_week", 0)),
-            "dep_hour": float(features.get("dep_hour", 0)),
-            "distance": float(features.get("distance", 0)),
-            "crs_elapsed_time": float(features.get("crs_elapsed_time", 0)),
             "delay_probability": round(prediction, 4),
             "is_delayed": float(prediction >= 0.5),
         }
+        record.update({col: float(features.get(col, 0)) for col in FEATURE_COLS})
+        if raw_input:
+            record.update({
+                "carrier": raw_input.get("carrier", ""),
+                "origin": raw_input.get("origin", ""),
+                "dest": raw_input.get("dest", ""),
+            })
         try:
             new_row = pd.DataFrame([record])
             if PREDICTIONS_PARQUET.exists():

@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
 
-import numpy as np
 import pandas as pd
 import uvicorn
 from fastapi import FastAPI, HTTPException
@@ -132,7 +131,7 @@ def _confidence_tier(prob: float) -> str:
     return "low"
 
 
-def _predict_one(flight: FlightInput) -> PredictionResult:
+def _predict_one(flight: FlightInput) -> tuple[PredictionResult, dict[str, float]]:
     model = _state.get("model")
     if model is None:
         raise HTTPException(status_code=503, detail="Model not loaded")
@@ -140,12 +139,13 @@ def _predict_one(flight: FlightInput) -> PredictionResult:
     features = _input_to_features(flight)
     prob = float(model.predict_proba(features)[:, 1][0])
 
-    return PredictionResult(
+    result = PredictionResult(
         delay_probability=round(prob, 4),
         is_delayed=prob >= 0.5,
         confidence=_confidence_tier(prob),
         threshold_used=0.5,
     )
+    return result, features.iloc[0].to_dict()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -160,14 +160,15 @@ async def health():
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(flight: FlightInput):
-    result = _predict_one(flight)
+    result, features = _predict_one(flight)
 
     pred_logger: Optional[PredictionLogger] = _state.get("prediction_logger")
     if pred_logger:
         pred_logger.log(
-            features=flight.model_dump(),
+            features=features,
             prediction=result.delay_probability,
             model_version=_state["model_version"],
+            raw_input=flight.model_dump(),
         )
 
     return PredictionResponse(
@@ -183,12 +184,13 @@ async def predict_batch(batch: BatchFlightInput):
     pred_logger: Optional[PredictionLogger] = _state.get("prediction_logger")
 
     for flight in batch.flights:
-        result = _predict_one(flight)
+        result, features = _predict_one(flight)
         if pred_logger:
             pred_logger.log(
-                features=flight.model_dump(),
+                features=features,
                 prediction=result.delay_probability,
                 model_version=_state["model_version"],
+                raw_input=flight.model_dump(),
             )
         responses.append(
             PredictionResponse(

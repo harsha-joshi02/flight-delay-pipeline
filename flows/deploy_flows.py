@@ -1,7 +1,6 @@
 """Register Prefect deployments with scheduled runs."""
 
 from prefect import serve
-from prefect.schedules import CronSchedule
 
 from flows.ingestion_flow import ingestion_flow
 from flows.training_flow import training_flow

@@ -74,7 +74,7 @@ def fetch_health() -> dict:
 
 
 def load_drift_summary() -> dict | None:
-    path = REPORTS_DIR / "drift_summary_latest.json"
+    path = REPORTS_DIR / "weekly_drift_summary.json"
     if not path.exists():
         return None
     with open(path) as f:
@@ -230,20 +230,20 @@ elif page == "Drift Reports":
         st.caption(f"Last report: {ts}")
 
         col1, col2, col3 = st.columns(3)
-        drift_detected = summary.get("dataset_drift", False)
+        drift_detected = summary.get("dataset_drift_detected", False)
         col1.metric("Dataset Drift", "YES" if drift_detected else "NO",
                     delta=None,
                     delta_color="inverse" if drift_detected else "normal")
         col2.metric("Drifted Columns",
                     f"{summary.get('drifted_columns_count', 0)} / {summary.get('total_columns', 0)}")
-        pred_drift = summary.get("prediction_drift") or {}
+        pred_drift = summary.get("prediction_drift_score")
         col3.metric("Prediction Drift Score",
-                    f"{pred_drift.get('drift_score', 0):.4f}" if pred_drift.get('drift_score') else "N/A")
+                    f"{pred_drift:.4f}" if pred_drift is not None else "N/A")
 
-        if summary.get("retrain_triggered"):
-            st.error("Retraining was triggered by this report.")
+        if summary.get("retrain_recommended"):
+            st.error("Retraining is recommended by this report.")
         else:
-            st.success("No retraining was triggered.")
+            st.success("Retraining is not recommended.")
 
         # Column drift table
         col_drift = summary.get("column_drift", {})
@@ -268,7 +268,7 @@ elif page == "Drift Reports":
             )
 
         # HTML report link
-        html_report = summary.get("report_html")
+        html_report = summary.get("html_report")
         if html_report and Path(html_report).exists():
             st.subheader("Full Evidently Report")
             with open(html_report, "r") as f:

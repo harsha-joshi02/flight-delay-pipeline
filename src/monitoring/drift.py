@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import pandas as pd
 
-from src.config import DATA_PROCESSED_DIR, FEATURE_COLS, REPORTS_DIR
+from src.config import DATA_PROCESSED_DIR, DATA_REFERENCE_DIR, FEATURE_COLS, REPORTS_DIR
 from src.logger import get_logger
 
 log = get_logger(__name__)
 
-REFERENCE_PARQUET = DATA_PROCESSED_DIR / "reference_snapshot.parquet"
+REFERENCE_PARQUET = DATA_REFERENCE_DIR / "reference_snapshot.parquet"
 PREDICTIONS_PARQUET = DATA_PROCESSED_DIR / "predictions_log.parquet"
 
 _DRIFT_PSI_THRESHOLD: float = 0.2
@@ -28,6 +29,7 @@ def _load_env_thresholds() -> tuple[float, float]:
 
 
 def save_reference_snapshot(df: pd.DataFrame) -> Path:
+    REFERENCE_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     cols = [c for c in FEATURE_COLS if c in df.columns]
     snapshot = df[cols].copy()
     snapshot.to_parquet(REFERENCE_PARQUET, index=False, compression="snappy")
@@ -112,18 +114,23 @@ def generate_drift_report(
             json.dump(result_dict, fh, indent=2, default=str)
 
         dataset_drift = False
-        share_drifted = 0.0
-        try:
-            metrics = result_dict.get("metrics", [])
-            for m in metrics:
-                if "DatasetDriftMetric" in str(m.get("metric", "")):
-                    dataset_drift = m["result"].get("dataset_drift", False)
-                    share_drifted = m["result"].get("share_of_drifted_columns", 0.0)
-                    break
-        except Exception:
-            pass
+        drifted_columns_count = 0
+        total_columns = len(shared_cols)
+        column_drift: dict[str, dict] = {}
+        for metric in result_dict.get("metrics", []):
+            metric_result = metric.get("result", {})
+            if "DatasetDriftMetric" in str(metric.get("metric", "")):
+                dataset_drift = metric_result.get("dataset_drift", False)
+                drifted_columns_count = metric_result.get("number_of_drifted_columns", 0)
+                total_columns = metric_result.get("number_of_columns", total_columns)
+            for col, values in metric_result.get("drift_by_columns", {}).items():
+                column_drift[col] = {
+                    "drift_detected": values.get("drift_detected", False),
+                    "drift_score": values.get("drift_score"),
+                    "stattest": values.get("stattest_name", ""),
+                }
 
-        pred_drift_score = 0.0
+        pred_drift_score = None
         if "delay_probability" in current.columns and "delay_probability" in reference.columns:
             pred_drift_score = _wasserstein_distance(
                 reference["delay_probability"], current["delay_probability"]
@@ -131,10 +138,16 @@ def generate_drift_report(
 
         summary = {
             "method": "evidently",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "dataset_drift_detected": dataset_drift,
-            "share_of_drifted_columns": share_drifted,
+            "drifted_columns_count": drifted_columns_count,
+            "total_columns": total_columns,
+            "share_of_drifted_columns": drifted_columns_count / max(total_columns, 1),
+            "column_drift": column_drift,
             "prediction_drift_score": pred_drift_score,
-            "retrain_recommended": dataset_drift or (pred_drift_score > pred_threshold),
+            "retrain_recommended": dataset_drift or (
+                pred_drift_score is not None and pred_drift_score > pred_threshold
+            ),
             "html_report": str(html_path),
             "json_report": str(json_path),
         }
@@ -176,7 +189,7 @@ def _fallback_drift_report(
     drifted_cols = [c for c, v in psi_scores.items() if v > psi_threshold]
     dataset_drift = len(drifted_cols) > len(cols) * 0.3
 
-    pred_drift_score = 0.0
+    pred_drift_score = None
     if "delay_probability" in current.columns and "delay_probability" in reference.columns:
         pred_drift_score = _wasserstein_distance(
             reference["delay_probability"], current["delay_probability"]
@@ -185,13 +198,25 @@ def _fallback_drift_report(
     json_path = REPORTS_DIR / f"{report_name}.json"
     result = {
         "method": "fallback_psi",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "psi_scores": psi_scores,
         "max_psi": max_psi,
-        "drifted_columns": drifted_cols,
         "dataset_drift_detected": dataset_drift,
+        "drifted_columns_count": len(drifted_cols),
+        "total_columns": len(cols),
         "share_of_drifted_columns": len(drifted_cols) / max(len(cols), 1),
+        "column_drift": {
+            col: {
+                "drift_detected": score > psi_threshold,
+                "drift_score": score,
+                "stattest": "PSI",
+            }
+            for col, score in psi_scores.items()
+        },
         "prediction_drift_score": pred_drift_score,
-        "retrain_recommended": dataset_drift or (pred_drift_score > pred_threshold),
+        "retrain_recommended": dataset_drift or (
+            pred_drift_score is not None and pred_drift_score > pred_threshold
+        ),
         "json_report": str(json_path),
     }
 

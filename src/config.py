@@ -18,10 +18,11 @@ DELAY_THRESHOLD_MINUTES: int = int(os.getenv("DELAY_THRESHOLD_MINUTES", "15"))
 
 DATA_RAW_DIR: Path = ROOT_DIR / os.getenv("DATA_RAW_DIR", "data/raw")
 DATA_PROCESSED_DIR: Path = ROOT_DIR / os.getenv("DATA_PROCESSED_DIR", "data/processed")
+DATA_REFERENCE_DIR: Path = ROOT_DIR / os.getenv("DATA_REFERENCE_DIR", "data/reference")
 MODELS_DIR: Path = ROOT_DIR / os.getenv("MODELS_DIR", "data/models")
 REPORTS_DIR: Path = ROOT_DIR / os.getenv("REPORTS_DIR", "data/reports")
 
-for _p in (DATA_RAW_DIR, DATA_PROCESSED_DIR, MODELS_DIR, REPORTS_DIR):
+for _p in (DATA_RAW_DIR, DATA_PROCESSED_DIR, DATA_REFERENCE_DIR, MODELS_DIR, REPORTS_DIR):
     _p.mkdir(parents=True, exist_ok=True)
 
 INITIAL_MONTHS: int = int(os.getenv("INITIAL_MONTHS", "12"))

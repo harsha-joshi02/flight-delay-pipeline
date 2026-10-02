@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-from src.config import BTS_REQUIRED_COLS, DELAY_THRESHOLD_MINUTES
 from src.logger import get_logger
 
 log = get_logger(__name__)

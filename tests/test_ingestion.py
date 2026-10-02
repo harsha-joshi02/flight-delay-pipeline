@@ -8,7 +8,6 @@ import pytest
 
 from src.ingestion.validator import (
     DataValidationError,
-    ValidationReport,
     clean,
     validate,
 )

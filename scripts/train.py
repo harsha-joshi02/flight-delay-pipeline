@@ -12,7 +12,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.evaluation.gate import evaluate_and_gate, GateDecision
+from src.evaluation.gate import evaluate_and_gate
 from src.features.engineer import load_processed
 from src.training.trainer import train
 

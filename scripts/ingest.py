@@ -16,6 +16,7 @@ from src.config import MODELS_DIR
 from src.features.engineer import FlightFeatureTransformer, build_features, save_processed
 from src.ingestion.downloader import download_range, load_raw
 from src.ingestion.validator import clean, validate
+from src.monitoring.drift import save_reference_snapshot
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(message)s",
@@ -47,6 +48,7 @@ def main(n_months: int = 3, refit: bool = True) -> None:
     feature_df, transformer = build_features(df, transformer=transformer, fit=(refit or transformer is None))
     transformer.save(transformer_path)
     save_processed(feature_df)
+    save_reference_snapshot(feature_df)
     log.info(
         f"Features saved — {len(feature_df):,} rows, "
         f"positive rate {feature_df['is_delayed'].mean():.2%}"

@@ -19,6 +19,7 @@ jobs:
       DELAY_THRESHOLD_MINUTES: "15"
       DATA_RAW_DIR: /tmp/pipeline/raw
       DATA_PROCESSED_DIR: /tmp/pipeline/processed
+      DATA_REFERENCE_DIR: /tmp/pipeline/reference
       MODELS_DIR: /tmp/pipeline/models
       REPORTS_DIR: /tmp/pipeline/reports
       INITIAL_MONTHS: "3"
@@ -37,7 +38,7 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Create data directories
-        run: mkdir -p /tmp/pipeline/{raw,processed,models,reports}
+        run: mkdir -p /tmp/pipeline/{raw,processed,reference,models,reports}
 
       - name: Ingest latest BTS data
         run: python scripts/ingest.py --months 3

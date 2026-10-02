@@ -157,6 +157,19 @@ class TestPredict:
         confidence = resp.json()["prediction"]["confidence"]
         assert confidence in ("high", "medium", "low")
 
+    def test_logs_engineered_features(self, client):
+        import src.serving.app as serving_app
+        from src.config import FEATURE_COLS
+
+        prediction_logger = MagicMock()
+        serving_app._state["prediction_logger"] = prediction_logger
+
+        resp = client.post("/predict", json=VALID_PAYLOAD)
+
+        assert resp.status_code == 200
+        logged_features = prediction_logger.log.call_args.kwargs["features"]
+        assert set(logged_features) == set(FEATURE_COLS)
+
 
 class TestBatchPredict:
     def test_batch_predict_returns_200(self, client):

@@ -6,6 +6,7 @@ x-app-env: &app-env
   MLFLOW_MODEL_NAME: flight-delay-model
   DATA_RAW_DIR: /app/data/raw
   DATA_PROCESSED_DIR: /app/data/processed
+  DATA_REFERENCE_DIR: /app/data/reference
   MODELS_DIR: /app/data/models
   REPORTS_DIR: /app/data/reports
   MODEL_PROMOTION_THRESHOLD: "0.005"

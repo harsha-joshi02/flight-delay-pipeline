@@ -33,9 +33,11 @@ def load_data_task():
 def drift_report_task(reference, predictions):
     logger = get_run_logger()
     summary = generate_drift_report(reference, predictions, report_name="weekly_drift")
+    pred_drift = summary["prediction_drift_score"]
+    pred_drift_display = f"{pred_drift:.4f}" if pred_drift is not None else "N/A"
     logger.info(
         f"Drift report done — dataset_drift={summary['dataset_drift_detected']}, "
-        f"pred_drift={summary['prediction_drift_score']:.4f}, "
+        f"pred_drift={pred_drift_display}, "
         f"retrain_recommended={summary['retrain_recommended']}"
     )
     return summary
