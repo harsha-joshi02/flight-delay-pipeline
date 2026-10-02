@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, Optional
 
 import numpy as np
@@ -11,6 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 import mlflow
+import mlflow.artifacts
 import mlflow.pyfunc
 from mlflow import MlflowClient
 
@@ -21,7 +23,7 @@ from src.config import (
     MLFLOW_MODEL_NAME,
     MLFLOW_TRACKING_URI,
 )
-from src.features.engineer import FlightFeatureTransformer
+from src.features.engineer import FlightFeatureTransformer, PIPELINE_FILENAME
 from src.logger import get_logger
 from src.monitoring.logger import PredictionLogger
 from src.serving.schemas import (
@@ -45,31 +47,41 @@ _state: dict[str, Any] = {
 
 def _load_model_and_transformer() -> None:
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
-    model_uri = f"models:/{MLFLOW_MODEL_NAME}/Production"
-
-    log.info("Loading production model", uri=model_uri)
     try:
-        _state["model"] = mlflow.xgboost.load_model(model_uri)
         client = MlflowClient(tracking_uri=MLFLOW_TRACKING_URI)
         versions = client.get_latest_versions(MLFLOW_MODEL_NAME, stages=["Production"])
-        _state["model_version"] = versions[0].version if versions else "unknown"
-        log.info("Model loaded", version=_state["model_version"])
-    except Exception as exc:
-        log.error("Failed to load production model", error=str(exc))
-        _state["model"] = None
+        if not versions:
+            raise RuntimeError("No production model version found")
 
-    try:
-        _state["transformer"] = FlightFeatureTransformer.load()
-        log.info("Feature transformer loaded")
+        version = versions[0]
+        model_uri = f"models:/{MLFLOW_MODEL_NAME}/{version.version}"
+        transformer_uri = f"{version.source.rstrip('/')}/{PIPELINE_FILENAME}"
+
+        log.info("Loading production model", uri=model_uri)
+        model = mlflow.xgboost.load_model(model_uri)
+        transformer_path = mlflow.artifacts.download_artifacts(
+            artifact_uri=transformer_uri,
+            tracking_uri=MLFLOW_TRACKING_URI,
+        )
+        transformer = FlightFeatureTransformer.load(Path(transformer_path))
+
+        _state["model"] = model
+        _state["transformer"] = transformer
+        _state["model_version"] = version.version
+        log.info("Model and feature transformer loaded", version=version.version)
     except Exception as exc:
-        log.error("Failed to load feature transformer", error=str(exc))
+        log.error("Failed to load production model and transformer", error=str(exc))
+        _state["model"] = None
         _state["transformer"] = None
+        _state["model_version"] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _load_model_and_transformer()
-    _state["prediction_logger"] = PredictionLogger()
+    if _state.get("model") is None or _state.get("transformer") is None:
+        _load_model_and_transformer()
+    if "prediction_logger" not in _state:
+        _state["prediction_logger"] = PredictionLogger()
     yield
     log.info("Shutting down prediction API")
 

@@ -29,8 +29,10 @@ from src.config import (
     MLFLOW_EXPERIMENT_NAME,
     MLFLOW_MODEL_NAME,
     MLFLOW_TRACKING_URI,
+    MODELS_DIR,
     TARGET_COL,
 )
+from src.features.engineer import PIPELINE_FILENAME
 from src.logger import get_logger
 
 log = get_logger(__name__)
@@ -68,6 +70,12 @@ def train(
     run_name: Optional[str] = None,
     tags: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
+    transformer_path = MODELS_DIR / PIPELINE_FILENAME
+    if not transformer_path.exists():
+        raise FileNotFoundError(
+            f"Feature transformer not found at {transformer_path}. Run ingestion before training."
+        )
+
     mlflow.set_tracking_uri(MLFLOW_TRACKING_URI)
     mlflow.set_experiment(MLFLOW_EXPERIMENT_NAME)
 
@@ -129,6 +137,7 @@ def train(
             artifact_path="model",
             registered_model_name=MLFLOW_MODEL_NAME,
         )
+        mlflow.log_artifact(str(transformer_path), artifact_path="model")
 
         model_uri = f"runs:/{run_id}/model"
         log.info("Model logged", run_id=run_id, model_uri=model_uri)

@@ -9,7 +9,7 @@ load_dotenv()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
-MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_TRACKING_URI: str = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
 MLFLOW_EXPERIMENT_NAME: str = os.getenv("MLFLOW_EXPERIMENT_NAME", "flight-delay-prediction")
 MLFLOW_MODEL_NAME: str = os.getenv("MLFLOW_MODEL_NAME", "flight-delay-model")
 

@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 API_BASE = os.getenv("API_BASE_URL", "http://localhost:8000")
-MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5000")
+MLFLOW_URI = os.getenv("MLFLOW_TRACKING_URI", "http://localhost:5001")
 REPORTS_DIR = Path(os.getenv("REPORTS_DIR", "data/reports"))
 
 st.set_page_config(

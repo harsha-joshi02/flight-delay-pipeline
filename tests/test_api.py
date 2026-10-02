@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pandas as pd
@@ -14,13 +15,11 @@ class MockModel:
     def predict(self, df):
         return np.array([0.35] * len(df))
 
-    class _model_impl:
-        @staticmethod
-        def predict_proba(df):
-            return np.column_stack([
-                np.full(len(df), 0.65),
-                np.full(len(df), 0.35),
-            ])
+    def predict_proba(self, df):
+        return np.column_stack([
+            np.full(len(df), 0.65),
+            np.full(len(df), 0.35),
+        ])
 
 
 class MockTransformer:
@@ -32,19 +31,64 @@ class MockTransformer:
         return out
 
 
+def test_model_and_transformer_load_from_same_version(tmp_path):
+    import src.serving.app as serving_app
+
+    version = SimpleNamespace(version="7", source="runs:/run-7/model")
+    client = MagicMock()
+    client.get_latest_versions.return_value = [version]
+    model = MockModel()
+    transformer = MockTransformer()
+    transformer_path = tmp_path / "feature_pipeline.pkl"
+    load_model = MagicMock(return_value=model)
+    download_artifacts = MagicMock(return_value=str(transformer_path))
+    mlflow = SimpleNamespace(
+        set_tracking_uri=MagicMock(),
+        xgboost=SimpleNamespace(load_model=load_model),
+        artifacts=SimpleNamespace(download_artifacts=download_artifacts),
+    )
+
+    with (
+        patch.object(serving_app, "_state", {}),
+        patch.object(serving_app, "mlflow", mlflow),
+        patch.object(serving_app, "MlflowClient", return_value=client),
+        patch.object(
+            serving_app.FlightFeatureTransformer,
+            "load",
+            return_value=transformer,
+        ) as load_transformer,
+    ):
+        serving_app._load_model_and_transformer()
+
+        load_model.assert_called_once_with("models:/flight-delay-model/7")
+        download_artifacts.assert_called_once_with(
+            artifact_uri="runs:/run-7/model/feature_pipeline.pkl",
+            tracking_uri=serving_app.MLFLOW_TRACKING_URI,
+        )
+        load_transformer.assert_called_once_with(transformer_path)
+        assert serving_app._state == {
+            "model": model,
+            "transformer": transformer,
+            "model_version": "7",
+        }
+
+
 @pytest.fixture
 def client():
-    with (
-        patch("src.serving.app._state", {
+    import src.serving.app as serving_app
+
+    with patch.object(
+        serving_app,
+        "_state",
+        {
             "model": MockModel(),
             "transformer": MockTransformer(),
             "model_version": "5",
             "start_time": 0.0,
             "prediction_logger": None,
-        }),
+        },
     ):
-        from src.serving.app import app
-        with TestClient(app) as c:
+        with TestClient(serving_app.app) as c:
             yield c
 
 

@@ -72,6 +72,7 @@ docker compose up -d --build
 # Bootstrap the model (run once after services are up)
 python scripts/ingest.py --months 10
 python scripts/train.py
+docker compose restart api
 ```
 
 | Service | URL |
@@ -90,7 +91,9 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 
-mlflow server --host 127.0.0.1 --port 5000
+mlflow server --host 127.0.0.1 --port 5001
+python scripts/ingest.py --months 10
+python scripts/train.py
 uvicorn src.serving.app:app --reload --port 8000
 streamlit run dashboard/app.py
 ```
